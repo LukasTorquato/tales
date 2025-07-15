@@ -1,0 +1,36 @@
+[project]
+name = "mike"
+version = "0.0.1"
+description = "Agentic RAG assistant with Ollama, Gemini and LangGraph."
+authors = [
+    { name = "Lukas Torquato, Bugra Kavdir, Alex Power, Sam Conneely" }
+]
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = [
+    "langgraph>=0.2.55",
+    "langchain>=0.3.10",
+    "langchain-core>=0.3.30",
+    "langchain-community>=0.3.9",
+    "langchain-ollama>=0.2.1",
+    "langchain_google_genai>=2.1.1",
+    "httpx>=0.28.1",
+    "tqdm>=4.66.1",
+    "pypdf>=3.17.1",
+    "python-dotenv==1.0.1",
+    "office-powerpoint-mcp-server",
+]
+
+[project.optional-dependencies]
+dev = ["mypy>=1.11.1", "ruff>=0.6.1"]
+
+[build-system]
+requires = ["setuptools>=73.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["mike"]
+
+[tool.setuptools.package-dir]
+"mike" = "src/mike"
