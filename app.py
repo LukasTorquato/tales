@@ -2,7 +2,7 @@ from tales.utils import print_state_messages
 from tales.agent import *
 from tales.db_handler import ChromaDBHandler
 
-def query_with_graph(agent, query: HumanMessage, thread_id: int, pmsgs: list = None):
+def query_with_graph(agent, msgs: list[AnyMessage], thread_id: int):
     """
     Process a query through the LangGraph
 
@@ -14,13 +14,13 @@ def query_with_graph(agent, query: HumanMessage, thread_id: int, pmsgs: list = N
     Returns:
         The result containing the answer and source documents
     """
-    print(f"\nQuery: {query.content}")
+    print(f"\nQuery: {msgs[-1].content}")
     print("Processing query through Agent's workflow...")
 
     config = {"configurable": {"thread_id": thread_id}}
 
     # Initialize state with the query
-    initial_state = {"context": [], "messages": query}
+    initial_state = {"context": [], "messages": msgs}
 
     # Run the graph
     result = agent.invoke(initial_state, config)
@@ -30,21 +30,23 @@ def query_with_graph(agent, query: HumanMessage, thread_id: int, pmsgs: list = N
 
 def main():
 
-    thread_id = 1
+    thread_id = 2
+    start = True
     # Initialize the ChromaDB handler
     db_handler = ChromaDBHandler(persist_directory=DB_PATH)
+    msgs = db_handler.get_conversation(thread_id)
     while True:
 
         question = input("Enter your question (or 'exit' to quit): ")
         if question.lower() == "exit":
             break
-        """
-        pmsgs = db_handler.get_conversation(thread_id)
-        if pmsgs:
-            print("Previous messages found in the database. Loading...")
-            for msg in pmsgs:
-                print(f"Previous message: {msg.content}")"""
-        result = query_with_graph(agent, HumanMessage(content=question), thread_id)
+
+        msgs.append(HumanMessage(content=question))
+        result = query_with_graph(agent, msgs, thread_id)
+
+        if start:
+            start = False
+            msgs = []
 
         db_handler.add_conversation(
             thread_id=thread_id,

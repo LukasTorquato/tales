@@ -68,7 +68,7 @@ class ChromaDBHandler:
             result = self.conversation_collection.get(ids=[str(thread_id)])
             if result["documents"]:
                 return json_to_messages(result["documents"][0])
-            return "No conversation found."
+            return []
         except Exception as e:
             print(f"Error retrieving conversation: {e}")
             raise
