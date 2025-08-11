@@ -8,7 +8,7 @@ USE_REASONING = False  # Set to True to use reasoning model
 LOCAL_LLMS = False  # Set to True to use local LLMs (Ollama) instead of Gemini
 DB_PATH = "database/tales"  # Path to the database
 DATA_FOLDER = "data/"  # Folder containing data files
-DOCS_RETRIEVED = 15  # Number of documents to retrieve for each query
+DOCS_RETRIEVED = 3  # Number of documents to retrieve for each query
 ACCEPTED_EXTENSIONS = [
     "pdf",
     "txt",  # Uncommented to accept txt files
@@ -24,7 +24,7 @@ load_dotenv()
 if LOCAL_LLMS:
     # Ollama LLM
     llm = ChatOllama(
-        model="qwen3:4b",
+        model="gemma3n:e4b",
         temperature=0,
         max_tokens=4096,
         streaming=True,
@@ -32,7 +32,7 @@ if LOCAL_LLMS:
     )
 
     # Ollama Embeddings
-    local_embeddings_model = OllamaEmbeddings(model="nomic-embed-text")
+    embeddings_model = OllamaEmbeddings(model="nomic-embed-text")
 
 else:
     llm = ChatGoogleGenerativeAI(

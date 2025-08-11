@@ -15,7 +15,7 @@ from langgraph.checkpoint.memory import MemorySaver
 
 # Local imports
 from tales.config import *
-from tales.prompts import rag_prompt_template, analysis_prompt
+from tales.prompts import rag_prompt_template, analysis_prompt, reflect_prompt
 from tales.document_processer import build_retriever
 
 
@@ -27,6 +27,7 @@ class GraphState(TypedDict):
     context: List[Document]
     summary: str  # Summary of the context
     query: AnyMessage  # Improved query for vector similarity search
+    more_research: bool  # Flag to indicate if more research is needed
     messages: Annotated[List[AnyMessage], add_messages]  # Built-in MessagesState
 
 
@@ -35,14 +36,22 @@ def analyze_query(state: GraphState) -> GraphState:
     # Analyze user query to improve vector similarity search
     print("Analyzing query...")
 
+    """
+    if state["summary"] != "":
+        context_str = "This is the summary of the conversation up to now:\n" + state["summary"] + "\n\n"
+    else:"""
     context_str = "Previous Messages:\n" + "\n\n".join(
         m.content for m in state["messages"][:-1]
     )
+
+    if state["more_research"]:
+        context_str += "\n\nPrevious query was not sufficient for research, reformulate another query, previous query for reference: " + state["query"].content
 
     prev_msg = SystemMessage(content=context_str)
     user_query = HumanMessage(content="User query: " + state["messages"][-1].content)
 
     state["query"] = llm.invoke([analysis_prompt, prev_msg, user_query])
+    print(f"Improved query: {state['query'].content}")
 
     return state
 
@@ -55,7 +64,7 @@ def retrieve_documents(state: GraphState) -> GraphState:
     # TODO: Check if similarity search can be done with HumanMessage instead of str
     # TODO: https://smith.langchain.com/hub/zulqarnain/multi-query-retriever-similarity
     try:
-        if state["query"].content == "" or state["query"].content is None:
+        if state["query"].content == "" or state["query"] is None:
             raise Exception("No query returned from analysis.")
 
         retrieved_docs = vector_store.similarity_search(state["query"].content, k=DOCS_RETRIEVED)
@@ -64,7 +73,8 @@ def retrieve_documents(state: GraphState) -> GraphState:
 
         state["context"] = retrieved_docs
     except Exception as e:
-        state["context"] = "No existent context. " + f"ERROR: {e}"
+        print(f"Error retrieving documents: {e}")
+        state["context"] = None
 
     return state
 
@@ -76,59 +86,44 @@ def generate_answer(state: GraphState) -> GraphState:
     documents = state["context"]
 
     # Format context from documents
-    context_str = "Context:\n" + "\n\n".join(doc.page_content for doc in documents)
+    if documents == [] or documents is None:
+        context_str = "No relevant context found."
+    else:
+        context_str = "Context:\n" + "\n\n".join(doc.page_content for doc in documents)
     context = SystemMessage(content=context_str)
 
-    # Get response from LLM
-    if USE_REASONING:
-        print("Thinking...")
-        message = [
-            llm_reasoning.invoke([rag_prompt_template] + [context] + state["messages"])
-        ]
-    else:
-        message = [llm.invoke([rag_prompt_template] + [context] + state["messages"])]
-
-    return {"context": documents, "messages": message}
-
-
-def summarize_conversation(state: GraphState) -> GraphState:
-    # Summarize the conversation
-    print("Summarizing conversation...")
-
-    summary = state.get("summary", "")
-    if summary:
-        # If a summary already exists, extend it with the latest message
-        summary_message = (
-            f"This is the summary of the conversation until now:\n{summary}\n\n"
-            + "Extend the summary with the following messages:\n"
-        )
-        summary += "\n\n" + state["messages"][-1].content
-    else:
-        summary_message = (
-            "Create a summary of the conversation with the following messages:\n"
-        )
-
-    messages = [HumanMessage(content=summary_message)] + state["messages"]
-    state["summary"] = llm.invoke(messages).content
-
-    # Remove all but the last two messages from the state
-    # This is to keep the context manageable and avoid exceeding token limits
-    state["messages"] = [RemoveMessage(id=m.id) for m in state["messages"][:-2]]
+    state["messages"] = [llm.invoke([rag_prompt_template] + [context] + state["messages"])]
 
     return state
 
 
-# Determine whether to end or summarize the conversation
-def should_continue(state: GraphState):
-    """Return the next node to execute."""
+def reflect_on_answer(state: GraphState) -> GraphState:
+    # Generate an answer using retrieved context
+    print("Reflecting on answer...")
 
-    messages = state["messages"]
+    msg = llm.invoke([reflect_prompt] + state["messages"])
 
-    # If there are more than six messages, then we summarize the conversation
-    if len(messages) > 6:
-        return "summarize_conversation"
+    state["more_research"] = True if msg.content == "more research needed" else False
 
-    # Otherwise we can just end
+    return state
+
+def need_rag(state: GraphState) -> bool:
+    """Check if the RAG process is needed based on the query."""
+    # If the query is empty or None, we don't need RAG
+    if state["query"] is None or state["query"].content == "":
+        return "response"
+
+    # Otherwise, we can proceed with RAG
+    return "retrieve"
+
+def more_research(state: GraphState) -> GraphState:
+    """do deeper research on the topic. Repeat the retrieval and answer generation steps."""
+
+    # Retrieve more documents based on the current query
+    if state["more_research"]:
+        print("Deepening research...")
+        return "analyze"
+    
     return END
 
 
@@ -136,7 +131,7 @@ def should_continue(state: GraphState):
 vector_store = build_retriever()
 
 # Create the graph
-print("Compiling LangGraph Graph...")
+print("Compiling RAG Agent...")
 workflow = StateGraph(GraphState)
 memory = MemorySaver()
 
@@ -144,10 +139,13 @@ memory = MemorySaver()
 workflow.add_node("analyze", analyze_query)
 workflow.add_node("retrieve", retrieve_documents)
 workflow.add_node("response", generate_answer)
+workflow.add_node("reflect", reflect_on_answer)
 
 # Create edges
-workflow.add_edge("analyze", "retrieve")
 workflow.add_edge("retrieve", "response")
+workflow.add_edge("response", "reflect")
+workflow.add_conditional_edges("analyze", need_rag, ["retrieve", "response"])
+workflow.add_conditional_edges("reflect", more_research, ["analyze", END])
 workflow.add_edge("response", END)
 
 # Set the entry point

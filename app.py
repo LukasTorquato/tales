@@ -20,7 +20,7 @@ def query_with_graph(agent, msgs: list[AnyMessage], thread_id: int):
     config = {"configurable": {"thread_id": thread_id}}
 
     # Initialize state with the query
-    initial_state = {"context": [], "messages": msgs}
+    initial_state = {"context": [], "messages": msgs, "summary": "", "query": None, "more_research": False}
 
     # Run the graph
     result = agent.invoke(initial_state, config)
@@ -30,8 +30,7 @@ def query_with_graph(agent, msgs: list[AnyMessage], thread_id: int):
 
 def main():
 
-    thread_id = 2
-    start = True
+    thread_id = 3
     # Initialize the ChromaDB handler
     db_handler = ChromaDBHandler(persist_directory=DB_PATH)
     msgs = db_handler.get_conversation(thread_id)
@@ -43,10 +42,6 @@ def main():
 
         msgs.append(HumanMessage(content=question))
         result = query_with_graph(agent, msgs, thread_id)
-
-        if start:
-            start = False
-            msgs = []
 
         db_handler.add_conversation(
             thread_id=thread_id,
