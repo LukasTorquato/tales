@@ -3,6 +3,7 @@ from tales.utils import messages_to_json, json_to_messages, get_available_docs
 from tales.document_processer import build_retriever
 from tales.config import embeddings_model
 from typing import Dict, List, Any, Optional
+import chromadb
 import os
 
 
@@ -127,11 +128,19 @@ class ChromaDBHandler:
             
         try:
             # Check if file exists
+            import os
             if not os.path.exists(file_path):
                 print(f"File not found: {file_path}")
                 return False
                 
-            build_retriever()  # Add document to th
+            # Use the build_retriever to add the document
+            # The build_retriever function will check if the document is already in the vector store
+            from tales.document_processer import load_documents, process_documents
+            documents = load_documents([file_path])
+            if documents:
+                chunks = process_documents(documents)
+                vector_store = build_retriever()
+                vector_store.add_documents(chunks)
             
             print(f"Added document to vector store: {file_path}")
             return True
