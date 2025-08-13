@@ -51,7 +51,6 @@ def analyze_query(state: GraphState) -> GraphState:
     user_query = HumanMessage(content="User query: " + state["messages"][-1].content)
 
     state["query"] = llm.invoke([analysis_prompt, prev_msg, user_query])
-    print(f"Improved query: {state['query'].content}")
 
     return state
 
