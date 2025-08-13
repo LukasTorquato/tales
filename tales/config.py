@@ -38,7 +38,7 @@ if LOCAL_LLMS:
 
 else:
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",  # -thinking-exp-01-21,
+        model="gemini-2.5-flash",
         temperature=0,
         max_tokens=512000,
         timeout=None,

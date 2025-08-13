@@ -1,7 +1,7 @@
 from tales.utils import print_state_messages
 from tales.agent import *
 from tales.db_handler import ChromaDBHandler
-from ppt_agent import ppt_agent
+from tales.ppt_agent import ppt_agent
 import asyncio
 
 def query_with_graph(agent, msgs: list[AnyMessage], thread_id: int):
