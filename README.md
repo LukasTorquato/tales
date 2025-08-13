@@ -21,4 +21,12 @@
 
 ### Running
 
-- Run app.py
+- CLI: Run app.py
+- Web UI: Start the web server and open the browser
+  - python web_app.py
+  - Visit http://localhost:8000
+  - The web interface provides:
+    - A conversation selector on the left
+    - A chat interface in the center
+    - A file viewer on the right showing documents in your vector database
+  - You can create new conversations, continue existing ones, and generate PowerPoint presentations.

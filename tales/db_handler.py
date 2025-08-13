@@ -1,6 +1,9 @@
 import chromadb
-from tales.utils import messages_to_json, json_to_messages
+from tales.utils import messages_to_json, json_to_messages, get_available_docs
+from tales.document_processer import build_retriever
+from tales.config import embeddings_model
 from typing import Dict, List, Any, Optional
+import os
 
 
 class ChromaDBHandler:
@@ -100,10 +103,80 @@ class ChromaDBHandler:
             if vectors["documents"]:
                 docs = []
                 for doc in vectors["metadatas"]:
-                    docs.append(doc["file_path"])
+                    docs.append(doc["source"])
                 return list(set(docs))
             else:
                 return []
         except Exception as e:
             print(f"Error retrieving documents: {e}")
             raise
+            
+    def add_document(self, file_path: str) -> bool:
+        """Add a new document to the vector store.
+        
+        Args:
+            file_path: Path to the document file
+            
+        Returns:
+            bool: True if document was added successfully
+        """
+        if self.documents_collection is None:
+            raise ValueError(
+                "Documents collection not initialized. Call initialize_collections first."
+            )
+            
+        try:
+            # Check if file exists
+            if not os.path.exists(file_path):
+                print(f"File not found: {file_path}")
+                return False
+                
+            build_retriever()  # Add document to th
+            
+            print(f"Added document to vector store: {file_path}")
+            return True
+            
+        except Exception as e:
+            print(f"Error adding document: {e}")
+            return False
+            
+    def delete_document(self, file_path: str) -> bool:
+        """Delete a document from the vector store.
+        
+        Args:
+            file_path: Path to the document to delete
+            
+        Returns:
+            bool: True if document was deleted successfully
+        """
+        if self.documents_collection is None:
+            raise ValueError(
+                "Documents collection not initialized. Call initialize_collections first."
+            )
+            
+        try:
+            # Check if document exists in the vector store
+            stored_docs = self.get_stored_documents()
+            if file_path not in stored_docs:
+                print(f"Document not found in vector store: {file_path}")
+                return False
+                
+            # Get all chunks for this document
+            results = self.documents_collection.get()
+            doc_ids = []
+            
+            for i, metadata in enumerate(results["metadatas"]):
+                if metadata["source"] == file_path:
+                    doc_ids.append(results["ids"][i])
+            
+            if doc_ids:
+                # Delete the chunks
+                self.documents_collection.delete(ids=doc_ids)
+                print(f"Deleted document from vector store: {file_path}")
+                return True
+            else:
+                return False
+                
+        except Exception as e:
+            print(f"Error deleting document: {e}")
+            return False

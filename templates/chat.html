@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tales - AI Document Assistant</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="/static/css/style.css" rel="stylesheet">
+    <style>
+        body {
+            display: flex;
+            min-height: 100vh;
+        }
+        
+        .sidebar {
+            width: 250px;
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            overflow-y: auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        
+        .file-viewer {
+            width: 250px;
+            height: 100vh;
+            position: sticky;
+            top: 0;
+            overflow-y: auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-left: 1px solid #dee2e6;
+        }
+        
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .chat-input-container {
+            padding: 20px;
+            border-top: 1px solid #dee2e6;
+            background-color: #fff;
+        }
+        
+        .user-message {
+            background-color: #f1f0f0;
+            padding: 10px 15px;
+            border-radius: 18px;
+            margin-bottom: 10px;
+            max-width: 75%;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        
+        .assistant-message {
+            background-color: #e3f2fd;
+            padding: 10px 15px;
+            border-radius: 18px;
+            margin-bottom: 10px;
+            max-width: 75%;
+        }
+        
+        .messages-container {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .new-chat-btn {
+            margin-bottom: 15px;
+        }
+        
+        .thread-item {
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 5px;
+        }
+        
+        .thread-item:hover {
+            background-color: #e9ecef;
+        }
+        
+        .thread-item.active {
+            background-color: #0d6efd;
+            color: white;
+        }
+        
+        .file-item {
+            font-size: 0.9rem;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    </style>
+</head>
+<body>
+    <!-- Left Sidebar - Conversation Selector -->
+    <div class="sidebar border-end">
+        <h5>Conversations</h5>
+        <button id="newChatBtn" class="btn btn-primary btn-sm new-chat-btn w-100">New Conversation</button>
+        <div id="conversationList">
+            {% for thread in threads %}
+            <div class="thread-item {% if thread == thread_id %}active{% endif %}" data-thread-id="{{ thread }}">
+                Conversation #{{ thread }}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Main Chat Area -->
+    <div class="chat-container">
+        <div class="chat-header p-3 border-bottom">
+            <h4>Conversation #<span id="currentThreadId">{{ thread_id }}</span></h4>
+            <button id="generatePptBtn" class="btn btn-outline-secondary btn-sm">Generate PowerPoint</button>
+        </div>
+        
+        <div class="chat-messages" id="chatMessages">
+            <div class="messages-container">
+                <!-- Messages will be loaded here -->
+            </div>
+        </div>
+        
+        <div class="chat-input-container">
+            <form id="chatForm" class="d-flex">
+                <input type="text" id="questionInput" class="form-control me-2" placeholder="Ask a question...">
+                <button type="submit" class="btn btn-primary">Send</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Right Sidebar - File Viewer -->
+    <div class="file-viewer">
+        <h5>Vector Database Files</h5>
+        <div class="mb-3">
+            <form id="uploadForm" enctype="multipart/form-data" class="mb-2">
+                <div class="input-group input-group-sm">
+                    <input type="file" class="form-control form-control-sm" id="fileInput" name="file">
+                    <button type="submit" class="btn btn-primary btn-sm">Upload</button>
+                </div>
+                <small class="text-muted">Accepted files: PDF, TXT, CSV, XLSX</small>
+            </form>
+        </div>
+        <div id="fileList">
+            {% for doc in stored_docs %}
+            <div class="file-item d-flex justify-content-between align-items-center" title="{{ doc }}">
+                <span class="text-truncate me-2">{{ doc.split('/')[-1] if '/' in doc else doc.split('\\')[-1] }}</span>
+                <button class="btn btn-sm btn-danger delete-file flex-shrink-0" data-path="{{ doc }}">
+                    <small>✖</small>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Bootstrap & jQuery JS -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        $(document).ready(function() {
+            const threadId = parseInt("{{ thread_id }}");
+            
+            // Load messages for the current thread
+            loadMessages(threadId);
+            
+            // Submit chat form
+            $('#chatForm').submit(function(e) {
+                e.preventDefault();
+                
+                const question = $('#questionInput').val().trim();
+                if (!question) return;
+                
+                // Add user message to chat
+                addMessageToChat('user', question);
+                
+                // Clear input
+                $('#questionInput').val('');
+                
+                // Show loading message
+                addLoadingMessage();
+                
+                // Send question to API
+                $.ajax({
+                    url: '/api/query',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        thread_id: threadId,
+                        question: question
+                    }),
+                    success: function(data) {
+                        // Remove loading message
+                        removeLoadingMessage();
+                        
+                        // Add assistant response to chat
+                        addMessageToChat('assistant', data.response);
+                        
+                        // Scroll to bottom
+                        scrollToBottom();
+                    },
+                    error: function(xhr) {
+                        // Remove loading message
+                        removeLoadingMessage();
+                        
+                        // Show error message
+                        const errorMsg = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'An error occurred';
+                        addMessageToChat('assistant', 'Error: ' + errorMsg);
+                        
+                        // Scroll to bottom
+                        scrollToBottom();
+                    }
+                });
+            });
+            
+            // Create new conversation
+            $('#newChatBtn').click(function() {
+                $.ajax({
+                    url: '/api/create_thread',
+                    type: 'POST',
+                    success: function(data) {
+                        window.location.href = '/chat/' + data.thread_id;
+                    },
+                    error: function(xhr) {
+                        alert('Error creating new conversation');
+                    }
+                });
+            });
+            
+            // Thread item click handler
+            $(document).on('click', '.thread-item', function() {
+                const threadId = $(this).data('thread-id');
+                window.location.href = '/chat/' + threadId;
+            });
+            
+            // Generate PowerPoint button
+            $('#generatePptBtn').click(function() {
+                const btn = $(this);
+                
+                // Disable button and show loading
+                btn.prop('disabled', true).text('Generating...');
+                
+                // Request PowerPoint generation
+                $.ajax({
+                    url: '/api/generate_ppt/' + threadId,
+                    type: 'POST',
+                    success: function(data) {
+                        alert('PowerPoint presentation created successfully!');
+                        btn.prop('disabled', false).text('Generate PowerPoint');
+                    },
+                    error: function(xhr) {
+                        const errorMsg = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'An error occurred';
+                        alert('Error generating PowerPoint: ' + errorMsg);
+                        btn.prop('disabled', false).text('Generate PowerPoint');
+                    }
+                });
+            });
+            
+            // Function to load messages for a thread
+            function loadMessages(threadId) {
+                $.ajax({
+                    url: '/api/get_messages/' + threadId,
+                    type: 'GET',
+                    success: function(data) {
+                        if (data.messages && data.messages.length > 0) {
+                            $('#chatMessages .messages-container').empty();
+                            
+                            data.messages.forEach(function(message) {
+                                addMessageToChat(message.role, message.content);
+                            });
+                            
+                            scrollToBottom();
+                        }
+                    },
+                    error: function(xhr) {
+                        console.error('Error loading messages', xhr);
+                    }
+                });
+            }
+            
+            // Function to add message to chat
+            function addMessageToChat(role, content) {
+                const messageClass = role === 'user' ? 'user-message' : 'assistant-message';
+                const messageHtml = `
+                    <div class="${messageClass}">
+                        ${formatMessage(content)}
+                    </div>
+                `;
+                
+                $('#chatMessages .messages-container').append(messageHtml);
+                scrollToBottom();
+            }
+            
+            // Function to add loading message
+            function addLoadingMessage() {
+                $('#chatMessages .messages-container').append(`
+                    <div class="assistant-message loading-message">
+                        <div class="spinner-border spinner-border-sm" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <span class="ms-2">Thinking...</span>
+                    </div>
+                `);
+                scrollToBottom();
+            }
+            
+            // Function to remove loading message
+            function removeLoadingMessage() {
+                $('#chatMessages .loading-message').remove();
+            }
+            
+            // Function to format message content
+            function formatMessage(content) {
+                // Convert line breaks to <br> tags
+                return content.replace(/\n/g, '<br>');
+            }
+            
+            // Function to scroll to bottom of chat
+            function scrollToBottom() {
+                const chatMessages = document.getElementById('chatMessages');
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            // File upload form handling
+            $('#uploadForm').submit(function(e) {
+                e.preventDefault();
+                
+                const fileInput = $('#fileInput')[0];
+                if (!fileInput.files.length) {
+                    alert('Please select a file to upload');
+                    return;
+                }
+                
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                
+                // Show loading state
+                const uploadBtn = $(this).find('button[type="submit"]');
+                const originalBtnText = uploadBtn.text();
+                uploadBtn.prop('disabled', true).text('Uploading...');
+                
+                $.ajax({
+                    url: '/api/files/upload',
+                    type: 'POST',
+                    data: formData,
+                    contentType: false,
+                    processData: false,
+                    success: function(data) {
+                        alert(data.message);
+                        // Reset form and refresh file list
+                        $('#uploadForm')[0].reset();
+                        refreshFileList();
+                    },
+                    error: function(xhr) {
+                        const errorMsg = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'An error occurred while uploading the file';
+                        alert('Error: ' + errorMsg);
+                    },
+                    complete: function() {
+                        uploadBtn.prop('disabled', false).text(originalBtnText);
+                    }
+                });
+            });
+            
+            // Delete file button handling
+            $(document).on('click', '.delete-file', function() {
+                const filePath = $(this).data('path');
+                const fileName = filePath.split('/').pop().split('\\').pop();
+                
+                if (confirm(`Are you sure you want to delete the file "${fileName}"?`)) {
+                    $.ajax({
+                        url: '/api/files/delete',
+                        type: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({
+                            file_path: filePath
+                        }),
+                        success: function(data) {
+                            alert(data.message);
+                            refreshFileList();
+                        },
+                        error: function(xhr) {
+                            const errorMsg = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'An error occurred while deleting the file';
+                            alert('Error: ' + errorMsg);
+                        }
+                    });
+                }
+            });
+            
+            // Function to refresh file list
+            function refreshFileList() {
+                $.ajax({
+                    url: '/api/files',
+                    type: 'GET',
+                    success: function(data) {
+                        $('#fileList').empty();
+                        
+                        if (data.files && data.files.length > 0) {
+                            data.files.forEach(function(file) {
+                                $('#fileList').append(`
+                                    <div class="file-item d-flex justify-content-between align-items-center" title="${file.path}">
+                                        <span class="text-truncate me-2">${file.name}</span>
+                                        <button class="btn btn-sm btn-danger delete-file flex-shrink-0" data-path="${file.path}">
+                                            <small>✖</small>
+                                        </button>
+                                    </div>
+                                `);
+                            });
+                        } else {
+                            $('#fileList').append('<div class="text-muted">No files in database</div>');
+                        }
+                    },
+                    error: function(xhr) {
+                        console.error('Error refreshing file list', xhr);
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>

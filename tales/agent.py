@@ -35,11 +35,6 @@ class GraphState(TypedDict):
 def analyze_query(state: GraphState) -> GraphState:
     # Analyze user query to improve vector similarity search
     print("Analyzing query...")
-
-    """
-    if state["summary"] != "":
-        context_str = "This is the summary of the conversation up to now:\n" + state["summary"] + "\n\n"
-    else:"""
     context_str = "Previous Messages:\n" + "\n\n".join(
         m.content for m in state["messages"][:-1]
     )
