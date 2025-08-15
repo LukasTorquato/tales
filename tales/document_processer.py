@@ -76,7 +76,7 @@ def process_documents(
 
     # Adjusting chunk size if its less then chunk_size: int = 500
     if total_length < chunk_size:
-        chunk_size = max(100, total_length // 2)  # I set minimum chunk size to 100
+        chunk_size = max(100, total_length // 2)  # Setting minimum chunk size to 100
         chunk_overlap = chunk_size // 4
         print(f"Adjusting chunk size to {chunk_size} due to small document")
 

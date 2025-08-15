@@ -26,7 +26,7 @@ load_dotenv()
 if LOCAL_LLMS:
     # Ollama LLM
     llm = ChatOllama(
-        model="gemma3n:e4b",
+        model="qwen3:4b",
         temperature=0,
         max_tokens=4096,
         streaming=True,
@@ -38,7 +38,7 @@ if LOCAL_LLMS:
 
 else:
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model="gemini-2.0-flash",
         temperature=0,
         max_tokens=512000,
         timeout=None,
@@ -60,6 +60,6 @@ server_params = StdioServerParameters(
         "C:/Users/lukas/Documents/Projects/MCP Servers/Office-PowerPoint-MCP-Server/ppt_mcp_server.py"
     ],
     env={
-        "PPT_TEMPLATE_PATH": "C:/Users/lukas/Documents/Projects/MCP Servers/Office-PowerPoint-MCP-Server/templates"
+        "PPT_TEMPLATE_PATH": "C:\\Users\\lukas\\Documents\\Projects\\MCP Servers\\Office-PowerPoint-MCP-Server\\templates"
     },
 )

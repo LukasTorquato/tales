@@ -45,11 +45,11 @@ def main():
         msgs.append(HumanMessage(content=question))
         result = query_with_graph(agent, msgs, thread_id)
 
-        """
+        
         db_handler.add_conversation(
             thread_id=thread_id,
             conversation=result["messages"],
-        )"""
+        )
 
         print_state_messages(result)
 

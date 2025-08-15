@@ -25,7 +25,6 @@ class GraphState(TypedDict):
     # Type for the state of the retrieval and query graph
 
     context: List[Document]
-    summary: str  # Summary of the context
     query: AnyMessage  # Improved query for vector similarity search
     more_research: bool  # Flag to indicate if more research is needed
     messages: Annotated[List[AnyMessage], add_messages]  # Built-in MessagesState
