@@ -9,7 +9,7 @@ USE_REASONING = False  # Set to True to use reasoning model
 LOCAL_LLMS = False  # Set to True to use local LLMs (Ollama) instead of Gemini
 DB_PATH = "database/tales"  # Path to the database
 DATA_FOLDER = "data/"  # Folder containing data files
-DOCS_RETRIEVED = 24  # Number of documents to retrieve for each query
+DOCS_RETRIEVED = 12  # Number of documents to retrieve for each query
 RUNNABLE_CONFIG = RunnableConfig(recursion_limit=100) # Increase default recursion limit for agentic LLM tool recursion
 ACCEPTED_EXTENSIONS = [
     "pdf",
@@ -42,7 +42,7 @@ else:
         temperature=0,
         max_tokens=512000,
         timeout=None,
-        max_retries=2,
+        max_retries=1,
     )
 
     # Gemini Embeddings

@@ -119,6 +119,7 @@ class RAGEvaluator:
         # Run the graph with tracking
         config = {"configurable": {"thread_id": thread_id}}
         result = agent.invoke(initial_state, config)
+        print(result)
         # Calculate time
         end_time = time.time()
         response_time = end_time - start_time
